@@ -21,7 +21,6 @@ DS_INTEGRATOR_KEY = DS_CONFIG['integrator_key']
 DS_USER_ID = DS_CONFIG['user_id']
 DS_ACCOUNT_ID = DS_CONFIG['account_id']
 DS_PRIVATE_KEY_PATH = DS_CONFIG['private_key_file']
-DS_BASE_PATH = DS_CONFIG['base_path']
 
 # Salesforce API Configuration
 SF_CONFIG = config['SALESFORCE']
@@ -48,7 +47,7 @@ def get_jwt_token():
         token_response = api_client.request_jwt_user_token(
             client_id=DS_INTEGRATOR_KEY,
             user_id=DS_USER_ID,
-            oauth_host_name=DS_BASE_PATH.replace('-d', ''),
+            oauth_host_name=config['DOCUSIGN']['authorization_server'],
             private_key_bytes=private_key,
             expires_in=3600,
             scopes=["signature", "impersonation"]
@@ -62,7 +61,7 @@ def get_docusign_api_client():
     """Authenticates with DocuSign using JWT and returns an API client."""
     try:
         api_client = ApiClient()
-        api_client.host = f"https://{DS_BASE_PATH}"
+        api_client.host = f"https://{config['DOCUSIGN']['api_server']}/restapi"
         api_client.set_default_header("Authorization", "Bearer " + get_jwt_token())
         return api_client
     except Exception as e:
@@ -92,7 +91,7 @@ def process_webhook_job(webhook_data):
         sf_client = get_salesforce_client()
 
         # Get Contract Number from DocuSign Custom Fields
-        custom_fields_url = f"https://{DS_BASE_PATH}/restapi/v2.1/accounts/{DS_ACCOUNT_ID}/envelopes/{envelope_id}/custom_fields"
+        custom_fields_url = f"{docusign_api_client.host}/v2.1/accounts/{DS_ACCOUNT_ID}/envelopes/{envelope_id}/custom_fields"
         headers = {'Authorization': docusign_api_client.default_headers['Authorization']}
         response = requests.get(custom_fields_url, headers=headers)
         response.raise_for_status()
@@ -123,7 +122,7 @@ def process_webhook_job(webhook_data):
         logging.info(f"Found Salesforce Contract ID: {salesforce_contract_id}")
 
         # Download the document
-        doc_download_url = f"https://{DS_BASE_PATH}/restapi/v2.1/accounts/{DS_ACCOUNT_ID}/envelopes/{envelope_id}/documents/combined"
+        doc_download_url = f"{docusign_api_client.host}/v2.1/accounts/{DS_ACCOUNT_ID}/envelopes/{envelope_id}/documents/combined"
         response = requests.get(doc_download_url, headers=headers)
         response.raise_for_status()
         doc_content_bytes = response.content
